@@ -21,7 +21,4 @@ public:
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ball Properties", meta = (AllowPrivateAccess = "true"))
 	UStaticMeshComponent* BallMesh;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
-	class UBoxComponent* CollisionBox;
 };
