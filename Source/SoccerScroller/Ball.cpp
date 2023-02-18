@@ -8,15 +8,9 @@ ABall::ABall()
 	SetRootComponent(BallMesh);
 	BallMesh->SetSimulatePhysics(true);
 	BallMesh->SetEnableGravity(true);
-	BallMesh->SetMassScale(FName(""), 15.0f);
-	BallMesh->SetLinearDamping(5.0f);
-	BallMesh->SetAngularDamping(5.0f);
-
-	//CollisionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionBox"));
-	//CollisionBox->SetupAttachment(BallMesh);
-	//CollisionBox->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
-	//CollisionBox->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
-	//CollisionBox->CanCharacterStepUp(false);
+	BallMesh->SetMassScale(FName(""), StartMassScale);
+	BallMesh->SetLinearDamping(StartLinearDamping);
+	BallMesh->SetAngularDamping(StartAngularDamping);
 }
 
 void ABall::BeginPlay()
@@ -29,5 +23,12 @@ void ABall::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+}
+
+void ABall::SetBallPhysicsToShooting()
+{
+	BallMesh->SetMassScale(FName(""), ShootMassScale);
+	BallMesh->SetLinearDamping(ShootLinearDamping);
+	BallMesh->SetAngularDamping(ShootAngularDamping);
 }
 

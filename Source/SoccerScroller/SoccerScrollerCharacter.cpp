@@ -6,13 +6,15 @@
 #include "Components/InputComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
+#include "SoccerPlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Components/BoxComponent.h"
-
-//////////////////////////////////////////////////////////////////////////
-// ASoccerScrollerCharacter
+#include "SoccerScrollerGameMode.h"
+#include "TimerManager.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "Ball.h"
 
 ASoccerScrollerCharacter::ASoccerScrollerCharacter()
 {
@@ -28,13 +30,13 @@ ASoccerScrollerCharacter::ASoccerScrollerCharacter()
 
 	// Configure character movement
 	GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input...	
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f); // ...at this rotation rate
+	GetCharacterMovement()->RotationRate = FRotator(0.0f, 120.0f, 0.0f); // ...at this rotation rate
 
 	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
 	// instead of recompiling to adjust them
 	GetCharacterMovement()->JumpZVelocity = 700.f;
 	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxWalkSpeed = 250.f;
+	GetCharacterMovement()->MaxWalkSpeed = StartSpeed;
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 
@@ -69,41 +71,56 @@ ASoccerScrollerCharacter::ASoccerScrollerCharacter()
 	RightFootCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	RightFootCollision->CanCharacterStepUp(false);
 
+	// Ball Check
+	BallCheckCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("BallCheckCollision"));
+	BallCheckCollision->SetupAttachment(GetMesh());
+	BallCheckCollision->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Overlap);
+	BallCheckCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	BallCheckCollision->CanCharacterStepUp(false);
+
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
 
 void ASoccerScrollerCharacter::BeginPlay()
 {
-	// Call the base class  
 	Super::BeginPlay();
 
-	//Add Input Mapping Context
-	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
+	OnActorBeginOverlap.AddDynamic(this, &ASoccerScrollerCharacter::ActorBeginOverlap);
+	OnActorEndOverlap.AddDynamic(this, &ASoccerScrollerCharacter::ActorEndOverlap);
+
+	SoccerPlayerController = SoccerPlayerController == nullptr ? Cast<ASoccerPlayerController>(Cast<APlayerController>(Controller)) : SoccerPlayerController;
+	SoccerGameMode = SoccerGameMode == nullptr ? GetWorld()->GetAuthGameMode<ASoccerScrollerGameMode>() : SoccerGameMode;
+	
+	//Add Input Mapping Context	
+	if (SoccerPlayerController)
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(SoccerPlayerController->GetLocalPlayer()))
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
 	}
+
+	// Start to check if All the collectibles are collected
+	StartCollectTimer();
 }
 
 void ASoccerScrollerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	AddMovementInput(FVector(1, 0, 0), 1.0f);
+	if (!bIsDead)
+	{
+		AddMovementInput(FVector(1, 0, 0), 1.0f);
+	}
 }
-
-//////////////////////////////////////////////////////////////////////////
-// Input
 
 void ASoccerScrollerCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
-		//Jumping
+		//Shooting
 		EnhancedInputComponent->BindAction(ShootAction, ETriggerEvent::Triggered, this, &ASoccerScrollerCharacter::ShootActionPressed);
 		EnhancedInputComponent->BindAction(ShootAction, ETriggerEvent::Completed, this, &ASoccerScrollerCharacter::ShootActionReleased);
 
@@ -112,9 +129,7 @@ void ASoccerScrollerCharacter::SetupPlayerInputComponent(class UInputComponent* 
 
 		//Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ASoccerScrollerCharacter::Look);
-
 	}
-
 }
 
 void ASoccerScrollerCharacter::Move(const FInputActionValue& Value)
@@ -155,11 +170,124 @@ void ASoccerScrollerCharacter::Look(const FInputActionValue& Value)
 
 void ASoccerScrollerCharacter::ShootActionPressed()
 {
+
 }
 
 void ASoccerScrollerCharacter::ShootActionReleased()
 {
+	if (Ball)
+	{
+		FVector Direction = GetActorForwardVector(); //GetMesh()->GetForwardVector();
+
+		Ball->SetBallPhysicsToShooting();
+
+		Ball->GetBallMesh()->AddImpulse(Direction * ShootingSpeed, FName(), true);
+	}
 }
+
+void ASoccerScrollerCharacter::SwitchToWalk()
+{
+	GetCharacterMovement()->MaxWalkSpeed = StartSpeed;
+}
+
+void ASoccerScrollerCharacter::SwitchToRun()
+{
+	GetCharacterMovement()->MaxWalkSpeed = EndSpeed;
+}
+
+void ASoccerScrollerCharacter::StartCollectTimer()
+{
+	GetWorldTimerManager().SetTimer(
+		CollectTimer,
+		this,
+		&ASoccerScrollerCharacter::CheckIsAllCollected,
+		CollectCheckDelay
+	);
+}
+
+void ASoccerScrollerCharacter::CheckIsAllCollected()
+{
+	if (SoccerGameMode)
+	{
+		if (SoccerGameMode->CheckIfNotCollected(this))
+		{
+			Dead();
+		}
+	}
+
+	if (!bIsDead)
+	{
+		StartCollectTimer();
+	}
+}
+
+void ASoccerScrollerCharacter::ActorBeginOverlap(AActor* OverlappedActor, AActor* OtherActor)
+{
+	if (Cast<ABall>(OtherActor))
+	{
+		Ball = Cast<ABall>(OtherActor);
+	}
+}
+
+void ASoccerScrollerCharacter::ActorEndOverlap(AActor* OverlappedActor, AActor* OtherActor)
+{
+	if (Cast<ABall>(OtherActor))
+	{
+		Dead();
+	}
+}
+
+void ASoccerScrollerCharacter::Dead()
+{
+	bIsDead = true;
+	GetCharacterMovement()->StopMovementImmediately();
+	StartRestartTimer();
+
+	if (SoccerPlayerController)
+	{
+		SoccerPlayerController->SetTimeOfDeath(GetWorld()->GetTimeSeconds());
+	}
+}
+
+void ASoccerScrollerCharacter::StartRestartTimer()
+{
+	GetWorldTimerManager().SetTimer(
+		RestartTimer,
+		this,
+		&ASoccerScrollerCharacter::RestartTimerFinished,
+		RestartDelay
+	);
+
+	if (SoccerPlayerController)
+	{
+		SoccerPlayerController->SetShowCountdown(true);
+	}
+}
+
+void ASoccerScrollerCharacter::RestartTimerFinished()
+{
+	if (SoccerPlayerController)
+	{
+		SoccerPlayerController->SetShowCountdown(false);
+	}
+
+	if (SoccerGameMode)
+	{
+		SoccerGameMode->PlayerDeath(this);
+	}
+}
+
+void ASoccerScrollerCharacter::Death()
+{
+	Destroy();
+
+	if (SoccerGameMode)
+	{
+		SoccerGameMode->RestartLevel();
+	}
+}
+
+
 
 
 

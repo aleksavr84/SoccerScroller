@@ -26,7 +26,10 @@ class ASoccerScrollerCharacter : public ACharacter
 	class UBoxComponent* LeftFootCollision;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Collision", meta = (AllowPrivateAccess = "true"))
-	class UBoxComponent* RightFootCollision;
+	UBoxComponent* RightFootCollision;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Collision", meta = (AllowPrivateAccess = "true"))
+	UBoxComponent* BallCheckCollision;
 
 	/** MappingContext */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -47,6 +50,13 @@ class ASoccerScrollerCharacter : public ACharacter
 public:
 	ASoccerScrollerCharacter();
 	
+	void Death();
+
+	UFUNCTION(BlueprintCallable)
+	void SwitchToWalk();
+
+	UFUNCTION(BlueprintCallable)
+	void SwitchToRun();
 
 protected:
 
@@ -68,6 +78,47 @@ protected:
 	virtual void BeginPlay();
 
 	virtual void Tick(float DeltaTime) override;
+
+private:
+	class ASoccerScrollerGameMode* SoccerGameMode;
+	class ASoccerPlayerController* SoccerPlayerController;
+	class ABall* Ball;
+
+	// Movement
+	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
+	float StartSpeed = 250.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
+	float EndSpeed = 500.f;
+
+	// Shooting
+	float ShootingSpeed = 7500.f;
+
+	// Collectable
+	FTimerHandle CollectTimer;
+	void StartCollectTimer();
+	void CheckIsAllCollected();
+
+	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
+	float CollectCheckDelay = 2.0f;
+;
+	// Restart
+	FTimerHandle RestartTimer;
+	void StartRestartTimer();
+	void RestartTimerFinished();
+
+	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
+	float RestartDelay = 3.0f;
+
+	bool bIsDead = false;
+	void Dead();
+
+	// Callbacks
+	UFUNCTION()
+	void ActorBeginOverlap(AActor* OverlappedActor, AActor* OtherActor);
+
+	UFUNCTION()
+	void ActorEndOverlap(AActor* OverlappedActor, AActor* OtherActor);
 
 public:
 	/** Returns CameraBoom subobject **/
