@@ -25,6 +25,11 @@ void ABall::Tick(float DeltaTime)
 
 }
 
+void ABall::DisablePhysics(bool bIsDisable)
+{
+	BallMesh->SetSimulatePhysics(!bIsDisable);
+}
+
 void ABall::SetBallPhysicsToShooting()
 {
 	BallMesh->SetMassScale(FName(""), ShootMassScale);

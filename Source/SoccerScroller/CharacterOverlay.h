@@ -12,4 +12,7 @@ class SOCCERSCROLLER_API UCharacterOverlay : public UUserWidget
 public:
 	UPROPERTY(meta = (BindWidget))
 	class UTextBlock* ScoreAmount;
+
+	UPROPERTY(meta = (BindWidget))
+	class UProgressBar* SpeedBar;
 };

@@ -1,5 +1,3 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #include "SoccerScrollerCharacter.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -15,41 +13,33 @@
 #include "TimerManager.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Ball.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "Components/ArrowComponent.h"
 
 ASoccerScrollerCharacter::ASoccerScrollerCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
-		
-	// Don't rotate when the controller rotates. Let that just affect the camera.
+
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	// Configure character movement
-	GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input...	
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 120.0f, 0.0f); // ...at this rotation rate
-
-	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
-	// instead of recompiling to adjust them
-	GetCharacterMovement()->JumpZVelocity = 700.f;
-	GetCharacterMovement()->AirControl = 0.35f;
+	GetCharacterMovement()->bOrientRotationToMovement = true; 	
+	GetCharacterMovement()->RotationRate = FRotator(0.0f, 120.0f, 0.0f); 
 	GetCharacterMovement()->MaxWalkSpeed = StartSpeed;
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 
-	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 700.0f; // The camera follows at this distance behind the character	
-	CameraBoom->bUsePawnControlRotation = false; // Rotate the arm based on the controller
+	CameraBoom->TargetArmLength = 900.0f; 	
+	CameraBoom->bUsePawnControlRotation = true; 
 
-	// Create a follow camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
-	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
-	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
+	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); 
+	FollowCamera->bUsePawnControlRotation = false; 
 
 	// Left Foot
 	LeftFootCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("LeftFootCollision"));
@@ -77,9 +67,6 @@ ASoccerScrollerCharacter::ASoccerScrollerCharacter()
 	BallCheckCollision->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Overlap);
 	BallCheckCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	BallCheckCollision->CanCharacterStepUp(false);
-
-	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
-	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
 
 void ASoccerScrollerCharacter::BeginPlay()
@@ -92,7 +79,6 @@ void ASoccerScrollerCharacter::BeginPlay()
 	SoccerPlayerController = SoccerPlayerController == nullptr ? Cast<ASoccerPlayerController>(Cast<APlayerController>(Controller)) : SoccerPlayerController;
 	SoccerGameMode = SoccerGameMode == nullptr ? GetWorld()->GetAuthGameMode<ASoccerScrollerGameMode>() : SoccerGameMode;
 	
-	//Add Input Mapping Context	
 	if (SoccerPlayerController)
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(SoccerPlayerController->GetLocalPlayer()))
@@ -103,96 +89,151 @@ void ASoccerScrollerCharacter::BeginPlay()
 
 	// Start to check if All the collectibles are collected
 	StartCollectTimer();
+	StartWarmupTimer();
 }
 
 void ASoccerScrollerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (!bIsDead)
+	// Player moves forwards automaticly 
+	if (!bIsDead &&
+		bIsStart &&
+		!bShootFinished &&
+		!bIsShooting)
 	{
-		AddMovementInput(FVector(1, 0, 0), 1.0f);
+		AddMovementInput(FVector(1.0f, 0.0f, 0.0f), 1.0f);
+	}
+
+	// Showing Shoot Power Indicator
+	if (bShootButtonPressed)
+	{
+		if (SoccerPlayerController)
+		{
+			ShootEndTime = GetWorld()->GetTimeSeconds();
+			CalculateShootingSpeed();
+
+			SoccerPlayerController->SetSpeedBar(ShootingSpeed, MaxShootingSpeed);
+		}
 	}
 }
 
 void ASoccerScrollerCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
-	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
+		//PauseMenu
+		EnhancedInputComponent->BindAction(PauseAction, ETriggerEvent::Started, this, &ASoccerScrollerCharacter::PauseActionPressed);
+
+		//Retry
+		EnhancedInputComponent->BindAction(RetryAction, ETriggerEvent::Triggered, this, &ASoccerScrollerCharacter::RetryActionPressed);
+
+		//Quit
+		EnhancedInputComponent->BindAction(QuitAction, ETriggerEvent::Triggered, this, &ASoccerScrollerCharacter::QuitActionPressed);
+			
 		//Shooting
-		EnhancedInputComponent->BindAction(ShootAction, ETriggerEvent::Triggered, this, &ASoccerScrollerCharacter::ShootActionPressed);
+		EnhancedInputComponent->BindAction(ShootAction, ETriggerEvent::Started, this, &ASoccerScrollerCharacter::ShootActionPressed);
 		EnhancedInputComponent->BindAction(ShootAction, ETriggerEvent::Completed, this, &ASoccerScrollerCharacter::ShootActionReleased);
 
 		//Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ASoccerScrollerCharacter::Move);
-
-		//Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ASoccerScrollerCharacter::Look);
 	}
 }
 
 void ASoccerScrollerCharacter::Move(const FInputActionValue& Value)
 {
-	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
 
-	if (Controller != nullptr)
+	if (Controller != nullptr && bIsMovementEnabled)
 	{
-		// find out which way is forward
 		const FRotator Rotation = Controller->GetControlRotation();
 		const FRotator YawRotation(0, Rotation.Yaw, 0);
-
-		// get forward vector
-		//const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-	
-		// get right vector 
 		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-		// add movement 
-		//AddMovementInput(ForwardDirection, MovementVector.Y);
-		AddMovementInput(RightDirection, MovementVector.X);
+		if (!bIsDead &&
+			bIsStart &&
+			!bShootFinished
+			&& !bIsShooting)
+		{
+			AddMovementInput(RightDirection, MovementVector.X);
+		}
 	}
 }
 
-void ASoccerScrollerCharacter::Look(const FInputActionValue& Value)
+void ASoccerScrollerCharacter::PauseActionPressed()
 {
-	// input is a Vector2D
-	FVector2D LookAxisVector = Value.Get<FVector2D>();
-
-	if (Controller != nullptr)
+	if (!bIsMenuShowing)
 	{
-		// add yaw and pitch input to controller
-		AddControllerYawInput(LookAxisVector.X);
-		AddControllerPitchInput(LookAxisVector.Y);
+		ShowHideMainMenu(true);
+
+	}
+	else if (bIsMenuShowing && !bShootFinished)
+	{	
+		ShowHideMainMenu(false);
 	}
 }
 
-void ASoccerScrollerCharacter::ShootActionPressed()
+void ASoccerScrollerCharacter::ShowHideMainMenu(bool bIsShowing)
 {
-
-}
-
-void ASoccerScrollerCharacter::ShootActionReleased()
-{
-	if (Ball)
+	if (SoccerPlayerController)
 	{
-		FVector Direction = GetActorForwardVector(); //GetMesh()->GetForwardVector();
-
-		Ball->SetBallPhysicsToShooting();
-
-		Ball->GetBallMesh()->AddImpulse(Direction * ShootingSpeed, FName(), true);
+		SoccerPlayerController->ShowHideMainMenu(bIsShowing);
+		bIsMenuShowing = bIsShowing;
+		SoccerPlayerController->SetPause(bIsShowing);
 	}
 }
 
-void ASoccerScrollerCharacter::SwitchToWalk()
+void ASoccerScrollerCharacter::RetryActionPressed()
 {
-	GetCharacterMovement()->MaxWalkSpeed = StartSpeed;
+	if (bIsMenuShowing)
+	{
+		// Restarting the level
+		Death();
+	}
 }
 
-void ASoccerScrollerCharacter::SwitchToRun()
+void ASoccerScrollerCharacter::QuitActionPressed()
 {
-	GetCharacterMovement()->MaxWalkSpeed = EndSpeed;
+	UWorld* World = GetWorld();
+
+	if (bIsMenuShowing && World && SoccerPlayerController)
+	{
+		UKismetSystemLibrary::QuitGame(
+			World,
+			SoccerPlayerController,
+			EQuitPreference::Quit,
+			true
+		);
+	}
+}
+
+void ASoccerScrollerCharacter::StartWarmupTimer()
+{
+	GetWorldTimerManager().SetTimer(
+		WarmupTimer,
+		this,
+		&ASoccerScrollerCharacter::WarmupTimerFinished,
+		StartDelay
+	);
+
+	if (SoccerPlayerController)
+	{
+		bIsMovementEnabled = false;
+		SoccerPlayerController->SetShowCountdown(true);
+		SoccerPlayerController->ShowHideHighScore(false);
+	}
+}
+
+void ASoccerScrollerCharacter::WarmupTimerFinished()
+{
+	if (SoccerPlayerController)
+	{
+		SoccerPlayerController->SetShowCountdown(false);
+		SoccerPlayerController->ShowHidePlayerHUD(true);
+
+		bIsStart = true;
+		bIsMovementEnabled = true;
+	}
 }
 
 void ASoccerScrollerCharacter::StartCollectTimer()
@@ -211,7 +252,9 @@ void ASoccerScrollerCharacter::CheckIsAllCollected()
 	{
 		if (SoccerGameMode->CheckIfNotCollected(this))
 		{
-			Dead();
+			bIsMovementEnabled = false;
+			bIsDead = true;
+			StartCooldownTimer();
 		}
 	}
 
@@ -226,55 +269,189 @@ void ASoccerScrollerCharacter::ActorBeginOverlap(AActor* OverlappedActor, AActor
 	if (Cast<ABall>(OtherActor))
 	{
 		Ball = Cast<ABall>(OtherActor);
+		Ball->SetOwner(this);
 	}
 }
 
 void ASoccerScrollerCharacter::ActorEndOverlap(AActor* OverlappedActor, AActor* OtherActor)
 {
-	if (Cast<ABall>(OtherActor))
+	if (Cast<ABall>(OtherActor) && !bIsShootingMode)
 	{
-		Dead();
+		bIsMovementEnabled = false;
+		bIsDead = true;
+		StartCooldownTimer();
+	}
+}
+
+void ASoccerScrollerCharacter::PlayerOutOfPlayground()
+{
+	bIsMovementEnabled = false;
+	bIsDead = true;
+	StartCooldownTimer();
+}
+
+void ASoccerScrollerCharacter::SwitchToWalk()
+{
+	GetCharacterMovement()->MaxWalkSpeed = StartSpeed;
+}
+
+void ASoccerScrollerCharacter::SwitchToRun()
+{
+	GetCharacterMovement()->MaxWalkSpeed = EndSpeed;
+}
+
+void ASoccerScrollerCharacter::SwitchToShootingMode()
+{
+	bIsShootingMode = true;
+}
+
+void ASoccerScrollerCharacter::ShootActionPressed()
+{
+	if (bIsShootingMode && bIsMovementEnabled)
+	{
+		bShootButtonPressed = true;
+		StartShootChargeTimer();
+		SoccerPlayerController->ShowHideSpeedBar(true);
+	}
+}
+
+void ASoccerScrollerCharacter::StartShootChargeTimer()
+{
+	ShootStartTime = GetWorld()->GetTimeSeconds();
+
+	GetWorldTimerManager().SetTimer(
+		ShootChargeTimer,
+		this,
+		&ASoccerScrollerCharacter::ShootChargeTimerFinished,
+		ShootChargeTime
+	);
+}
+
+void ASoccerScrollerCharacter::ShootChargeTimerFinished()
+{
+	if (bShootButtonPressed)
+	{
+		// Restarting the Timer, when shoot button is still pressed
+		StartShootChargeTimer();
+	}
+}
+
+void ASoccerScrollerCharacter::ShootActionReleased()
+{
+	if (bIsShootingMode)
+	{
+		StartShooting();
+		bShootButtonPressed = false;
+	}
+}
+
+void ASoccerScrollerCharacter::StartShooting()
+{
+	if (Ball)
+	{
+		bIsShooting = true;
+		bIsMovementEnabled = false;
+		
+		LeftFootCollision->SetCollisionResponseToChannel(ECollisionChannel::ECC_GameTraceChannel1, ECollisionResponse::ECR_Ignore);
+		RightFootCollision->SetCollisionResponseToChannel(ECollisionChannel::ECC_GameTraceChannel1, ECollisionResponse::ECR_Ignore);
+
+		PlayShootMontage();
+	}
+}
+
+void ASoccerScrollerCharacter::PlayShootMontage()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+
+	if (AnimInstance && ShootMontage)
+	{
+		AnimInstance->Montage_Play(ShootMontage);
+	}
+}
+
+void ASoccerScrollerCharacter::CalculateShootingSpeed()
+{
+	ShootingSpeed = UKismetMathLibrary::MapRangeClamped(
+		ShootEndTime - ShootStartTime,
+		0.f,
+		ShootChargeTime,
+		MinShootingSpeed,
+		MaxShootingSpeed
+	);
+}
+
+// From AnimNotify
+void ASoccerScrollerCharacter::Shooting()
+{
+	if (Ball)
+	{
+		Ball->DisablePhysics(false);
+		ShootTheBall();
+	}
+}
+
+void ASoccerScrollerCharacter::ShootTheBall()
+{
+	if (Ball)
+	{
+		if (SoccerPlayerController)
+		{
+			SoccerPlayerController->SetSpeedBar(ShootingSpeed, MaxShootingSpeed);
+		}
+
+		FVector Direction = GetArrowComponent()->GetForwardVector();
+		
+		Ball->SetBallPhysicsToShooting();
+		Ball->GetBallMesh()->AddImpulse(Direction * ShootingSpeed, FName(), true);
+	}
+}
+
+// From AnimNotify
+void ASoccerScrollerCharacter::ShootingFinished()
+{
+	if (Ball)
+	{		
+		bIsShooting = false;
+		bShootFinished = true;
+
+		LeftFootCollision->SetCollisionResponseToChannel(ECollisionChannel::ECC_GameTraceChannel1, ECollisionResponse::ECR_Block);
+		RightFootCollision->SetCollisionResponseToChannel(ECollisionChannel::ECC_GameTraceChannel1, ECollisionResponse::ECR_Block);
+
+		SoccerPlayerController->ShowHideSpeedBar(false);
+		StartCooldownTimer();
 	}
 }
 
 void ASoccerScrollerCharacter::Dead()
 {
 	bIsDead = true;
-	GetCharacterMovement()->StopMovementImmediately();
-	StartRestartTimer();
-
-	if (SoccerPlayerController)
-	{
-		SoccerPlayerController->SetTimeOfDeath(GetWorld()->GetTimeSeconds());
-	}
-}
-
-void ASoccerScrollerCharacter::StartRestartTimer()
-{
-	GetWorldTimerManager().SetTimer(
-		RestartTimer,
-		this,
-		&ASoccerScrollerCharacter::RestartTimerFinished,
-		RestartDelay
-	);
-
-	if (SoccerPlayerController)
-	{
-		SoccerPlayerController->SetShowCountdown(true);
-	}
-}
-
-void ASoccerScrollerCharacter::RestartTimerFinished()
-{
-	if (SoccerPlayerController)
-	{
-		SoccerPlayerController->SetShowCountdown(false);
-	}
+	bIsMovementEnabled = false;
 
 	if (SoccerGameMode)
 	{
 		SoccerGameMode->PlayerDeath(this);
 	}
+}
+
+void ASoccerScrollerCharacter::StartCooldownTimer()
+{
+	GetWorldTimerManager().SetTimer(
+		CooldownTimer,
+		this,
+		&ASoccerScrollerCharacter::CooldownTimerFinished,
+		CooldownTime
+	);
+
+	if (SoccerPlayerController)
+	{
+		SoccerPlayerController->ShowHideHighScore(true);
+		SoccerPlayerController->ShowHidePlayerHUD(false);
+	}
+}
+
+void ASoccerScrollerCharacter::CooldownTimerFinished()
+{
+	ShowHideMainMenu(true);
 }
 
 void ASoccerScrollerCharacter::Death()

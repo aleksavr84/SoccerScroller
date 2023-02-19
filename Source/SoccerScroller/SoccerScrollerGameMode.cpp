@@ -11,7 +11,7 @@
 
 ASoccerScrollerGameMode::ASoccerScrollerGameMode()
 {
-	static ConstructorHelpers::FClassFinder<APawn> PlayerPawnBPClass(TEXT("/Game/ThirdPerson/Blueprints/BP_ThirdPersonCharacter"));
+	static ConstructorHelpers::FClassFinder<APawn> PlayerPawnBPClass(TEXT("/Game/Blueprints/Character/BP_ThirdPersonCharacterSoccer"));
 	if (PlayerPawnBPClass.Class != NULL)
 	{
 		DefaultPawnClass = PlayerPawnBPClass.Class;
@@ -64,7 +64,7 @@ void ASoccerScrollerGameMode::RestartLevel()
 	if (World)
 	{
 		bUseSeamlessTravel = false;
-		World->ServerTravel(FString("/Game/Maps/ThirdPersonMap?listen"));
+		World->ServerTravel(FString("/Game/Maps/SoccerMap?listen"));
 	}
 }
 

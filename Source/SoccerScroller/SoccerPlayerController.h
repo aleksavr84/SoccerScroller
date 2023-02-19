@@ -10,8 +10,19 @@ class SOCCERSCROLLER_API ASoccerPlayerController : public APlayerController
 	GENERATED_BODY()
 	
 public:
+	void ShowHideMainMenu(bool bIsShowing);
+
+	void ShowHidePlayerHUD(bool bIsShowing);
 	void SetHUDScore(float Score);
+
+	void ShowHideSpeedBar(bool bIsShowing);
+	void SetSpeedBar(float Speed, float MaxSpeed);
+
 	void SetHUDAnnouncementCountdown(float CountdownTime);
+
+	void SetHighScore(float Score);
+	void ShowHideHighScore(bool bIsShowing);
+
 	virtual void Tick(float DeltaTime) override;
 
 protected:
@@ -20,6 +31,9 @@ protected:
 private:
 	UPROPERTY()
 	class ASoccerHUD* SoccerHUD;
+
+	UPROPERTY()
+	class ASoccerScrollerGameMode* SoccerGameMode;
 
 	float HUDScore;
 

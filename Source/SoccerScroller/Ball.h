@@ -12,6 +12,7 @@ class SOCCERSCROLLER_API ABall : public AActor
 public:
 	ABall();
 	virtual void Tick(float DeltaTime) override;
+	void DisablePhysics(bool bIsDisable);
 	void SetBallPhysicsToShooting();
 
 protected:

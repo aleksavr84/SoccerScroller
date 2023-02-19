@@ -35,17 +35,25 @@ class ASoccerScrollerCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputMappingContext* DefaultMappingContext;
 
-	/** Jump Input Action */
+	/** Shoot Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputAction* ShootAction;
+
+	/** PauseMenu Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* PauseAction;
+
+	/** Retry Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* RetryAction;
+
+	/** Quit Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* QuitAction;
 
 	/** Move Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputAction* MoveAction;
-
-	/** Look Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	class UInputAction* LookAction;
 
 public:
 	ASoccerScrollerCharacter();
@@ -58,16 +66,24 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SwitchToRun();
 
+	UFUNCTION(BlueprintCallable)
+	void SwitchToShootingMode();
+
+	UFUNCTION(BlueprintCallable)
+	void PlayerOutOfPlayground();
+
 protected:
 
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
 
-	/** Called for looking input */
-	void Look(const FInputActionValue& Value);
+	void PauseActionPressed();
 
 	void ShootActionPressed();
 	void ShootActionReleased();
+
+	void RetryActionPressed();
+	void QuitActionPressed();
 			
 
 protected:
@@ -91,8 +107,46 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
 	float EndSpeed = 500.f;
 
+	bool bIsMovementEnabled = false;
+
+	// MainMenu
+	bool bIsMenuShowing = false;
+	void ShowHideMainMenu(bool bIsShowing);
+
 	// Shooting
-	float ShootingSpeed = 7500.f;
+	UPROPERTY(EditAnywhere, Category = "Initialization")
+	class UAnimMontage* ShootMontage;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
+	float MinShootingSpeed = 100.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
+	float MaxShootingSpeed = 5500.f;
+
+	void PlayShootMontage();
+	void StartShooting();
+
+	UFUNCTION(BlueprintCallable)
+	void Shooting();
+
+	UFUNCTION(BlueprintCallable)
+	void ShootingFinished();
+
+	FTimerHandle ShootChargeTimer;
+	void StartShootChargeTimer();
+	void ShootChargeTimerFinished();
+
+	float ShootChargeTime = 3.f;
+	bool bShootButtonPressed = false;
+	float ShootStartTime = 0.f;
+	float ShootEndTime = 0.f;
+	float ShootingSpeed = 1.f;
+	bool bIsShootingMode = false;
+	bool bIsShooting = false;
+	bool bShootFinished = false;
+	
+	void CalculateShootingSpeed();
+	void ShootTheBall();
 
 	// Collectable
 	FTimerHandle CollectTimer;
@@ -102,16 +156,25 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
 	float CollectCheckDelay = 2.0f;
 ;
-	// Restart
-	FTimerHandle RestartTimer;
-	void StartRestartTimer();
-	void RestartTimerFinished();
+	// Start
+	FTimerHandle WarmupTimer;
+	void StartWarmupTimer();
+	void WarmupTimerFinished();
 
 	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
-	float RestartDelay = 3.0f;
+	float StartDelay = 3.0f;
 
+	bool bIsStart = false;
 	bool bIsDead = false;
 	void Dead();
+
+	// Cooldown
+	FTimerHandle CooldownTimer;
+	void StartCooldownTimer();
+	void CooldownTimerFinished();
+
+	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
+	float CooldownTime = 3.0f;
 
 	// Callbacks
 	UFUNCTION()

@@ -10,6 +10,16 @@ class SOCCERSCROLLER_API ASoccerHUD : public AHUD
 	GENERATED_BODY()
 	
 public:
+	// Main Menu
+	UPROPERTY(EditAnywhere, Category = "Initialization")
+	TSubclassOf<class UUserWidget> MainMenuClass;
+
+	UPROPERTY()
+	class UMainMenu* MainMenu;
+
+	void AddMainMenu();
+
+	// CharacterOverlay
 	UPROPERTY(EditAnywhere, Category = "Initialization")
 	TSubclassOf<class UUserWidget> CharacterOverlayClass;
 
@@ -18,6 +28,7 @@ public:
 
 	void AddCharacterOverlay();
 
+	// Announcements
 	UPROPERTY(EditAnywhere, Category = "Initialization")
 	TSubclassOf<UUserWidget> AnnouncementClass;
 
@@ -25,4 +36,13 @@ public:
 	class UAnnouncement* Announcement;
 
 	void AddAnnouncement();
+
+	// HighScore
+	UPROPERTY(EditAnywhere, Category = "Initialization")
+	TSubclassOf<UUserWidget> HighScoreClass;
+
+	UPROPERTY()
+	class UHighScore* HighScore;
+
+	void AddHighScore();
 };

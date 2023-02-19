@@ -16,7 +16,7 @@ ACollectable::ACollectable()
 
 		OverlapSphere = CreateDefaultSubobject<USphereComponent>(TEXT("OverlapSphere"));
 		OverlapSphere->SetupAttachment(RootComponent);
-		OverlapSphere->SetSphereRadius(150.f);
+		OverlapSphere->SetSphereRadius(70.f);
 		OverlapSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 		OverlapSphere->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 		OverlapSphere->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
@@ -46,7 +46,11 @@ void ACollectable::ActorBeginOverlap(AActor* OverlappedActor, AActor* OtherActor
 	if (SoccerCharacter)
 	{
 		ASoccerScrollerGameMode* SoccerGameMode = GetWorld()->GetAuthGameMode<ASoccerScrollerGameMode>();
-		SoccerGameMode->PlayerScoreUpdate(SoccerCharacter, Cast<ASoccerPlayerController>(SoccerCharacter->GetController()));
+		
+		if (SoccerGameMode)
+		{
+			SoccerGameMode->PlayerScoreUpdate(SoccerCharacter, Cast<ASoccerPlayerController>(SoccerCharacter->GetController()));
+		}
 	
 		if (PickupSound)
 		{

@@ -18,6 +18,7 @@ void ASoccerPlayerState::AddToScore(float ScoreAmount)
         if (SoccerPlayerController)
         {
             SoccerPlayerController->SetHUDScore(GetScore());
+            SoccerPlayerController->SetHighScore(GetScore());
         }
     }
 }
