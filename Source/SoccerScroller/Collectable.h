@@ -28,6 +28,9 @@ private:
 	UPROPERTY(EditAnywhere)
 	class UNiagaraSystem* PickupEffect;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
+	float Score = 1.f;
+
 	// Callbacks
 	UFUNCTION()
 	void ActorBeginOverlap(AActor* OverlappedActor, AActor* OtherActor);

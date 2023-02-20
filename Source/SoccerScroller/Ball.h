@@ -32,13 +32,13 @@ private:
 	float StartMassScale = 15.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
-	float ShootLinearDamping = 1.0f;
+	float ShootLinearDamping = 2.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
-	float ShootAngularDamping = 1.0f;
+	float ShootAngularDamping = 0.2f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
-	float ShootMassScale = 5.0f;
+	float ShootMassScale = 55.0f;
 
 public:
 	FORCEINLINE UStaticMeshComponent* GetBallMesh() const { return BallMesh; }

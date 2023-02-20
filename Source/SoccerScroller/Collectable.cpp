@@ -49,7 +49,7 @@ void ACollectable::ActorBeginOverlap(AActor* OverlappedActor, AActor* OtherActor
 		
 		if (SoccerGameMode)
 		{
-			SoccerGameMode->PlayerScoreUpdate(SoccerCharacter, Cast<ASoccerPlayerController>(SoccerCharacter->GetController()));
+			SoccerGameMode->PlayerScoreUpdate(SoccerCharacter, Cast<ASoccerPlayerController>(SoccerCharacter->GetController()), Score);
 		}
 	
 		if (PickupSound)

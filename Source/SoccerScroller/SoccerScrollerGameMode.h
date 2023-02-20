@@ -14,7 +14,7 @@ class ASoccerScrollerGameMode : public AGameModeBase
 public:
 	ASoccerScrollerGameMode();
 	bool CheckIfNotCollected(class ACharacter* PlayerCharacter);
-	void PlayerScoreUpdate(class ASoccerScrollerCharacter* SoccerCharacter, class ASoccerPlayerController* SoccerController);
+	void PlayerScoreUpdate(class ASoccerScrollerCharacter* SoccerCharacter, class ASoccerPlayerController* SoccerController, float ScoreToAdd);
 	void PlayerDeath(ASoccerScrollerCharacter* SoccerCharacter);
 	void RestartLevel();
 

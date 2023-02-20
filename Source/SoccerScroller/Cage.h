@@ -40,6 +40,9 @@ private:
 	UPROPERTY(EditAnywhere)
 	class UNiagaraSystem* HitEffectRight;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
+	float Score = 1.f;
+
 	bool bHitDetected = false;
 
 	// Callbacks

@@ -54,7 +54,7 @@ void ACage::ActorBeginOverlap(AActor* OverlappedActor, AActor* OtherActor)
 
 			if (SoccerCharacter && SoccerGameMode)
 			{
-				SoccerGameMode->PlayerScoreUpdate(SoccerCharacter, Cast<ASoccerPlayerController>(SoccerCharacter->GetController()));
+				SoccerGameMode->PlayerScoreUpdate(SoccerCharacter, Cast<ASoccerPlayerController>(SoccerCharacter->GetController()), Score);
 			
 				if (HitSound)
 				{

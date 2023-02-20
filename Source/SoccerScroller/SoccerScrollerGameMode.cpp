@@ -42,13 +42,13 @@ bool ASoccerScrollerGameMode::CheckIfNotCollected(ACharacter* PlayerCharacter)
 	return false;
 }
 
-void ASoccerScrollerGameMode::PlayerScoreUpdate(class ASoccerScrollerCharacter* SoccerCharacter, class ASoccerPlayerController* SoccerController)
+void ASoccerScrollerGameMode::PlayerScoreUpdate(class ASoccerScrollerCharacter* SoccerCharacter, class ASoccerPlayerController* SoccerController, float ScoreToAdd)
 {
 	ASoccerPlayerState* SoccerPlayerState = SoccerController ? Cast<ASoccerPlayerState>(SoccerController->PlayerState) : nullptr;
 
 	if (SoccerPlayerState)
 	{
-		SoccerPlayerState->AddToScore(1.f);
+		SoccerPlayerState->AddToScore(ScoreToAdd);
 	}
 }
 

@@ -118,10 +118,14 @@ private:
 	class UAnimMontage* ShootMontage;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
-	float MinShootingSpeed = 100.f;
+	float MinShootingSpeed = 1200.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
-	float MaxShootingSpeed = 5500.f;
+	float MaxShootingSpeed = 6500.f;
+
+	double MinShootingAngle = 0.15;
+	double MaxShootingAngle = 0.65;
+	double ShootingAngle = 0;
 
 	void PlayShootMontage();
 	void StartShooting();
@@ -145,7 +149,7 @@ private:
 	bool bIsShooting = false;
 	bool bShootFinished = false;
 	
-	void CalculateShootingSpeed();
+	void CalculateShootingSpeedAndAngle();
 	void ShootTheBall();
 
 	// Collectable

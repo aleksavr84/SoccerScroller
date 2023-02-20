@@ -111,7 +111,7 @@ void ASoccerScrollerCharacter::Tick(float DeltaTime)
 		if (SoccerPlayerController)
 		{
 			ShootEndTime = GetWorld()->GetTimeSeconds();
-			CalculateShootingSpeed();
+			CalculateShootingSpeedAndAngle();
 
 			SoccerPlayerController->SetSpeedBar(ShootingSpeed, MaxShootingSpeed);
 		}
@@ -338,7 +338,7 @@ void ASoccerScrollerCharacter::ShootChargeTimerFinished()
 
 void ASoccerScrollerCharacter::ShootActionReleased()
 {
-	if (bIsShootingMode)
+	if (bIsShootingMode && bShootButtonPressed)
 	{
 		StartShooting();
 		bShootButtonPressed = false;
@@ -369,7 +369,7 @@ void ASoccerScrollerCharacter::PlayShootMontage()
 	}
 }
 
-void ASoccerScrollerCharacter::CalculateShootingSpeed()
+void ASoccerScrollerCharacter::CalculateShootingSpeedAndAngle()
 {
 	ShootingSpeed = UKismetMathLibrary::MapRangeClamped(
 		ShootEndTime - ShootStartTime,
@@ -377,6 +377,14 @@ void ASoccerScrollerCharacter::CalculateShootingSpeed()
 		ShootChargeTime,
 		MinShootingSpeed,
 		MaxShootingSpeed
+	);
+
+	ShootingAngle = UKismetMathLibrary::MapRangeClamped(
+		ShootEndTime - ShootStartTime,
+		0.f,
+		ShootChargeTime,
+		MinShootingAngle,
+		MaxShootingAngle
 	);
 }
 
@@ -401,6 +409,8 @@ void ASoccerScrollerCharacter::ShootTheBall()
 
 		FVector Direction = GetArrowComponent()->GetForwardVector();
 		
+		Direction = FVector(Direction.X, Direction.Y, ShootingAngle);
+
 		Ball->SetBallPhysicsToShooting();
 		Ball->GetBallMesh()->AddImpulse(Direction * ShootingSpeed, FName(), true);
 	}
