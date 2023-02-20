@@ -14,7 +14,10 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Ball.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Kismet/GameplayStatics.h"
 #include "Components/ArrowComponent.h"
+#include "Components/SplineComponent.h"
+#include "Components/SplineMeshComponent.h"
 
 ASoccerScrollerCharacter::ASoccerScrollerCharacter()
 {
@@ -67,6 +70,10 @@ ASoccerScrollerCharacter::ASoccerScrollerCharacter()
 	BallCheckCollision->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Overlap);
 	BallCheckCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	BallCheckCollision->CanCharacterStepUp(false);
+
+	// Shooting Path prediction
+	ShootingPath = CreateDefaultSubobject<USplineComponent>(FName("ShootingPath"));
+	ShootingPath->SetupAttachment(RootComponent);
 }
 
 void ASoccerScrollerCharacter::BeginPlay()
@@ -116,6 +123,8 @@ void ASoccerScrollerCharacter::Tick(float DeltaTime)
 			SoccerPlayerController->SetSpeedBar(ShootingSpeed, MaxShootingSpeed);
 		}
 	}
+
+	UpdateShootingPath();
 }
 
 void ASoccerScrollerCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -334,6 +343,108 @@ void ASoccerScrollerCharacter::ShootChargeTimerFinished()
 		// Restarting the Timer, when shoot button is still pressed
 		StartShootChargeTimer();
 	}
+}
+
+void ASoccerScrollerCharacter::UpdateShootingPath()
+{
+	TArray<FVector> Path;
+	
+	if (bShootButtonPressed && bIsShootingMode)
+	{
+		FindShootLocation(Path);
+		DrawShootingPath(Path);
+	} 
+	else
+	{
+		TArray<FVector> EmptyPath;
+		DrawShootingPath(EmptyPath);
+	}
+}
+
+void ASoccerScrollerCharacter::FindShootLocation(TArray<FVector>& OutPath)
+{
+	if (Ball)
+	{
+		FVector Start = Ball->GetActorLocation();
+		FVector Look = GetArrowComponent()->GetForwardVector();
+		
+		Look = FVector(Look.X, Look.Y, ShootingAngle);
+
+		FPredictProjectilePathParams Params(
+			10.f,
+			Start,
+			Look * ShootingSpeed,
+			2.f,
+			ECollisionChannel::ECC_Visibility,
+			this
+		);
+
+		//Params.DrawDebugType = EDrawDebugTrace::ForOneFrame;
+		Params.bTraceComplex = true;
+
+		FPredictProjectilePathResult Result;
+
+		bool bHit = UGameplayStatics::PredictProjectilePath(this, Params, Result);
+
+		if (!bHit) return;
+
+		for (FPredictProjectilePathPointData PointData : Result.PathData)
+		{
+			OutPath.Add(PointData.Location);
+		}
+	}
+}
+
+void ASoccerScrollerCharacter::DrawShootingPath(const TArray<FVector>& Path)
+{
+	UpdateSpline(Path);
+
+	for (USplineMeshComponent* SplineMesh : ShootingPathMeshPool)
+	{
+		SplineMesh->SetVisibility(false);
+	}
+
+	int32 SegmentNum = Path.Num() - 1;
+
+	for (int32 i = 0; i < SegmentNum; ++i)
+	{
+		if (ShootingPathMeshPool.Num() <= i)
+		{
+			USplineMeshComponent* SplineMesh = NewObject<USplineMeshComponent>(this);
+			SplineMesh->SetMobility(EComponentMobility::Movable);
+			SplineMesh->AttachToComponent(ShootingPath, FAttachmentTransformRules::KeepRelativeTransform);
+			SplineMesh->SetStaticMesh(ShootingPathMesh);
+			SplineMesh->SetMaterial(0, ShootingPathMaterial);
+			SplineMesh->SetWorldScale3D(FVector(1.f, 0.25f, 0.25f));
+			SplineMesh->RegisterComponent();
+
+			ShootingPathMeshPool.Add(SplineMesh);
+		}
+
+		USplineMeshComponent* SplineMesh = ShootingPathMeshPool[i];
+		SplineMesh->SetVisibility(true);
+
+		FVector StartPos, StartTangent, EndPos, EndTangent;
+
+		ShootingPath->GetLocalLocationAndTangentAtSplinePoint(i, StartPos, StartTangent);
+		ShootingPath->GetLocalLocationAndTangentAtSplinePoint(i + 1, EndPos, EndTangent);
+
+		SplineMesh->SetStartAndEnd(StartPos, StartTangent, EndPos, EndTangent, true);
+	}
+}
+
+void ASoccerScrollerCharacter::UpdateSpline(const TArray<FVector>& Path)
+{
+	ShootingPath->ClearSplinePoints(false);
+
+	for (int32 i = 0; i < Path.Num(); ++i)
+	{
+		FVector LocalPosition = ShootingPath->GetComponentTransform().InverseTransformPosition(Path[i]);
+		FSplinePoint Point(i, LocalPosition, ESplinePointType::Curve);
+		ShootingPath->AddPoint(Point, false);
+	}
+
+	ShootingPath->UpdateSpline();
 }
 
 void ASoccerScrollerCharacter::ShootActionReleased()

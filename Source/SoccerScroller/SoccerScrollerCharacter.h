@@ -55,6 +55,12 @@ class ASoccerScrollerCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputAction* MoveAction;
 
+	UPROPERTY(VisibleAnywhere)
+	class USplineComponent* ShootingPath;
+
+	UPROPERTY()
+	TArray<class USplineMeshComponent*> ShootingPathMeshPool;
+
 public:
 	ASoccerScrollerCharacter();
 	
@@ -122,6 +128,17 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
 	float MaxShootingSpeed = 6500.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
+	class UStaticMesh* ShootingPathMesh;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Initialization")
+	class UMaterialInterface* ShootingPathMaterial;
+
+	void FindShootLocation(TArray<FVector>& OutPath);
+	void UpdateShootingPath();
+	void DrawShootingPath(const TArray<FVector>& Path);
+	void UpdateSpline(const TArray<FVector>& Path);
 
 	double MinShootingAngle = 0.15;
 	double MaxShootingAngle = 0.65;
